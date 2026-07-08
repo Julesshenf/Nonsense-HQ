@@ -1,0 +1,6 @@
+{
+  "name": "Deep Work",
+  "description": "An interactive emotional catharsis and slacking companion for high-pressure students and office workers. Features state-tracking, a slack-off timer, AI Boss/Teacher energy analyzers, and the Small Things Tribunal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
