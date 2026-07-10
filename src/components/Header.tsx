@@ -1,66 +1,50 @@
 import React from "react";
 
 interface HeaderProps {
-  title: string;
   isMadness: boolean;
-  onHistoryClick: () => void;
-  onFavoritesClick: () => void;
-  showBackButton?: boolean;
-  onBackClick?: () => void;
+  activeTab: "tools" | "rankings" | "my";
+  onMyClick: () => void;
+  onRankingsClick: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  title,
   isMadness,
-  onHistoryClick,
-  onFavoritesClick,
-  showBackButton = false,
-  onBackClick,
+  activeTab,
+  onMyClick,
+  onRankingsClick,
 }) => {
+  const activeClasses = isMadness ? "bg-red-600 text-white shadow-sm" : "bg-blue-600 text-white shadow-sm";
+  const idleClasses = isMadness ? "text-red-600 hover:bg-red-50" : "text-blue-600 hover:bg-blue-50";
+
   return (
     <header className="fixed top-0 left-0 right-0 h-16 z-50 flex justify-between items-center px-4 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm">
       <div className="flex items-center gap-2">
-        {showBackButton ? (
-          <button
-            onClick={onBackClick}
-            className="w-10 h-10 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-100 active:scale-95 transition-all"
-            id="back-btn"
-          >
-            <span className="material-symbols-outlined text-2xl">arrow_back</span>
-          </button>
-        ) : (
-          <button
-            onClick={onHistoryClick}
-            className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-all ${
-              isMadness ? "text-red-600 hover:bg-red-50" : "text-blue-600 hover:bg-blue-50"
-            }`}
-            id="header-history-btn"
-            title="历史记录"
-          >
-            <span className="material-symbols-outlined text-[28px]">history</span>
-          </button>
-        )}
+        <button
+          onClick={onMyClick}
+          className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-all ${
+            activeTab === "my" ? activeClasses : idleClasses
+          }`}
+          id="header-my-btn"
+          title="我的"
+          aria-label="我的"
+        >
+          <span className={`material-symbols-outlined text-[28px] ${activeTab === "my" ? "material-fill" : ""}`}>person</span>
+        </button>
       </div>
 
-      <h1
-        className={`font-sans text-xl font-bold transition-colors duration-300 ${
-          isMadness ? "text-red-600 font-extrabold tracking-wider animate-pulse" : "text-blue-600"
-        }`}
-        id="header-title"
-      >
-        {title}
-      </h1>
+      <div aria-hidden="true" />
 
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end w-16 h-12 group">
         <button
-          onClick={onFavoritesClick}
-          className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-all ${
-            isMadness ? "text-red-600 hover:bg-red-50" : "text-blue-600 hover:bg-blue-50"
+          onClick={onRankingsClick}
+          className={`w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-all duration-200 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto focus:opacity-100 focus:pointer-events-auto ${
+            activeTab === "rankings" ? activeClasses : idleClasses
           }`}
-          id="header-favorites-btn"
-          title="我的收藏"
+          id="header-rankings-btn"
+          title="排名"
+          aria-label="排名"
         >
-          <span className="material-symbols-outlined text-[28px]">grade</span>
+          <span className={`material-symbols-outlined text-[28px] ${activeTab === "rankings" ? "material-fill" : ""}`}>leaderboard</span>
         </button>
       </div>
     </header>

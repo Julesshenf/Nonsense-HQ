@@ -12,7 +12,7 @@ export const DEFAULT_WORKER_TASKS: Task[] = [
   { id: "w1", text: "完成今日份的“牛马”日报/周报KPI", completed: false },
   { id: "w2", text: "深呼吸，告诉自己世界很美好，工作只是赚钱工具", completed: true },
   { id: "w3", text: "反思为什么我还没退休（明明卡里只有三位数）", completed: false },
-  { id: "w4", text: "双击打开微信和IDE窗口，实现光速切屏防御", completed: false },
+  { id: "w4", text: "双击打开微信和IDE窗口,实现光速切屏防御", completed: false },
   { id: "w5", text: "在带薪拉屎的过程中，领悟生命与工作的终极真谛", completed: false },
 ];
 

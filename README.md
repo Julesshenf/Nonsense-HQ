@@ -1,20 +1,53 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Nonsense HQ
 
-# Run and deploy your AI Studio app
+An interactive emotional catharsis and slacking companion for high-pressure students and office workers.
 
-This contains everything you need to run your app locally.
+## Features
 
-View your app in AI Studio: https://ai.studio/apps/80c904de-5ec5-487d-a1f4-aa59a860e96c
+- Responsive single-page UI with desktop/tablet and mobile layouts.
+- Mood check-in panel with quick emotions and expanded emotion choices.
+- Bullet wall for venting, with clickable pause, edit, and delete controls.
+- Decompression toolbox with a slacking timer, wheel, finger calculator, relationship calculator, and gender predictor.
+- Profile area with favorites and history.
+- AI-assisted energy-field analysis and small-things tribunal flows.
+
+## Tech Stack
+
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- Express
+- Gemini API integration
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+Prerequisites: Node.js.
 
 1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+
+   ```bash
+   npm install
+   ```
+
+2. Create `.env.local` from `.env.example` and set your Gemini API key.
+
+3. Start the dev server:
+
+   ```bash
+   npm run dev
+   ```
+
+## Scripts
+
+```bash
+npm run dev
+npm run lint
+npm run build
+npm run start
+```
+
+## Notes
+
+- `data/accounts.json` is kept empty in the repository. Runtime account data should not be committed.
+- `.env*` files are ignored except `.env.example`.

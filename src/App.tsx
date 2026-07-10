@@ -7,7 +7,6 @@ import {
   DEFAULT_WORKER_GOALS 
 } from "./data";
 import { Header } from "./components/Header";
-import { TabHome } from "./components/TabHome";
 import { TabTools } from "./components/TabTools";
 import { TabRankings } from "./components/TabRankings";
 import { TabMy } from "./components/TabMy";
@@ -32,7 +31,7 @@ const getStoredAccount = (): PlayerAccount | null => {
 
 export default function App() {
   // Navigation State
-  const [activeTab, setActiveTab] = useState<"home" | "tools" | "rankings" | "my">("home");
+  const [activeTab, setActiveTab] = useState<"tools" | "rankings" | "my">("tools");
 
   // Core Identity & Theme
   const [identity, setIdentity] = useState<Identity>("Student");
@@ -344,26 +343,11 @@ export default function App() {
     setWorkerGoals(DEFAULT_WORKER_GOALS);
     setFavorites([]);
     setHistory([]);
-    setActiveTab("home");
+    setActiveTab("tools");
   };
 
   const renderActiveTab = () => {
     switch (activeTab) {
-      case "home":
-        return (
-          <TabHome
-            identity={identity}
-            setIdentity={handleIdentityChange}
-            isMadness={isMadness}
-            toggleMadness={handleToggleMadness}
-            tasks={identity === "Student" ? studentTasks : workerTasks}
-            onToggleTask={handleToggleTask}
-            onAddTask={handleAddTask}
-            onOpenEnergyModal={() => setIsEnergyModalOpen(true)}
-            onOpenTribunalModal={() => setIsTribunalModalOpen(true)}
-            onOpenTaskGoalModal={() => setIsTaskGoalModalOpen(true)}
-          />
-        );
       case "tools":
         return (
           <TabTools
@@ -405,90 +389,20 @@ export default function App() {
     }
   };
 
-  const getHeaderTitle = () => {
-    if (activeTab === "tools") return "摸鱼工具箱";
-    if (activeTab === "rankings") return "摸鱼大亨排行榜";
-    if (activeTab === "my") return "摸鱼大师空间";
-    return "Deep Work";
-  };
-
   return (
     <div className={`min-h-screen bg-bg-base text-on-surface flex flex-col transition-colors duration-300 ${isMadness ? "bg-red-50/10" : ""}`}>
       {/* Dynamic Header */}
       <Header
-        title={getHeaderTitle()}
         isMadness={isMadness}
-        onHistoryClick={() => setIsHistoryModalOpen(true)}
-        onFavoritesClick={() => setIsFavoritesModalOpen(true)}
+        activeTab={activeTab}
+        onMyClick={() => setActiveTab((currentTab) => currentTab === "my" ? "tools" : "my")}
+        onRankingsClick={() => setActiveTab("rankings")}
       />
 
       {/* Main Container */}
-      <main className="flex-1 pt-20 pb-28 px-4 w-full max-w-[480px] mx-auto overflow-y-auto">
+      <main className="flex-1 pt-20 pb-8 px-4 w-full max-w-[480px] mx-auto overflow-y-auto md:max-w-none md:px-8 lg:px-10">
         {renderActiveTab()}
       </main>
-
-      {/* Bottom Sticky Tab Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex justify-around items-center py-2 pb-safe bg-white/80 backdrop-blur-xl shadow-[0_-4px_20px_rgba(31,41,55,0.05)] border-t border-gray-100 rounded-t-3xl">
-        <button
-          onClick={() => setActiveTab("home")}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-2xl active:scale-95 transition-all duration-200 cursor-pointer ${
-            activeTab === "home"
-              ? isMadness
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-blue-600 text-white shadow-sm"
-              : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-          }`}
-          id="nav-home"
-        >
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === "home" && "material-fill"}`}>home</span>
-          <span className="text-[10px] font-bold mt-1 tracking-wider uppercase">首页</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("tools")}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-2xl active:scale-95 transition-all duration-200 cursor-pointer ${
-            activeTab === "tools"
-              ? isMadness
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-blue-600 text-white shadow-sm"
-              : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-          }`}
-          id="nav-tools"
-        >
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === "tools" && "material-fill"}`}>widgets</span>
-          <span className="text-[10px] font-bold mt-1 tracking-wider uppercase">工具</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("rankings")}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-2xl active:scale-95 transition-all duration-200 cursor-pointer ${
-            activeTab === "rankings"
-              ? isMadness
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-blue-600 text-white shadow-sm"
-              : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-          }`}
-          id="nav-rankings"
-        >
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === "rankings" && "material-fill"}`}>leaderboard</span>
-          <span className="text-[10px] font-bold mt-1 tracking-wider uppercase">排名</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab("my")}
-          className={`flex flex-col items-center justify-center px-4 py-1.5 rounded-2xl active:scale-95 transition-all duration-200 cursor-pointer ${
-            activeTab === "my"
-              ? isMadness
-                ? "bg-red-600 text-white shadow-sm"
-                : "bg-blue-600 text-white shadow-sm"
-              : "text-gray-500 hover:bg-gray-50 hover:text-gray-800"
-          }`}
-          id="nav-my"
-        >
-          <span className={`material-symbols-outlined text-[22px] ${activeTab === "my" && "material-fill"}`}>person</span>
-          <span className="text-[10px] font-bold mt-1 tracking-wider uppercase">我的</span>
-        </button>
-      </nav>
 
       {/* Pop-up Modals Integration */}
       <EnergyFieldModal
