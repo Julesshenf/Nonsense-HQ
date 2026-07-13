@@ -3,6 +3,8 @@ import { Identity, FavoriteItem, HistoryItem } from "../types";
 import { SLACK_TITLES, SLACKING_QUOTES } from "../data";
 
 interface TabMyProps {
+  identity: Identity;
+  onIdentityChange: (identity: Identity) => void;
   userHours: number;
   userName: string;
   userTitle: string;
@@ -17,6 +19,8 @@ interface TabMyProps {
 }
 
 export const TabMy: React.FC<TabMyProps> = ({
+  identity,
+  onIdentityChange,
   userHours,
   userName,
   userMotto,
@@ -173,6 +177,39 @@ export const TabMy: React.FC<TabMyProps> = ({
                 title="修改资料"
               >
                 <span className="material-symbols-outlined text-base">edit</span>
+              </button>
+            </div>
+
+            <div className="flex items-center gap-1 rounded-full border border-gray-100 bg-white/80 p-1 shadow-sm" aria-label="身份选择">
+              <button
+                type="button"
+                aria-pressed={identity === "Worker"}
+                onClick={() => onIdentityChange("Worker")}
+                className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                  identity === "Worker"
+                    ? isMadness
+                      ? "bg-red-600 text-white"
+                      : "bg-blue-600 text-white"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">work</span>
+                牛马
+              </button>
+              <button
+                type="button"
+                aria-pressed={identity === "Student"}
+                onClick={() => onIdentityChange("Student")}
+                className={`flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold transition-all active:scale-95 ${
+                  identity === "Student"
+                    ? isMadness
+                      ? "bg-red-600 text-white"
+                      : "bg-blue-600 text-white"
+                    : "text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                <span className="material-symbols-outlined text-base">school</span>
+                学生
               </button>
             </div>
 

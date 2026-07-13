@@ -1,11 +1,5 @@
 import { useState, useEffect } from "react";
-import { Identity, Task, LongTermGoal, FavoriteItem, HistoryItem, PlayerAccount } from "./types";
-import { 
-  DEFAULT_STUDENT_TASKS, 
-  DEFAULT_WORKER_TASKS, 
-  DEFAULT_STUDENT_GOALS, 
-  DEFAULT_WORKER_GOALS 
-} from "./data";
+import { Identity, FavoriteItem, HistoryItem, PlayerAccount } from "./types";
 import { Header } from "./components/Header";
 import { TabTools } from "./components/TabTools";
 import { TabRankings } from "./components/TabRankings";
@@ -17,7 +11,6 @@ import {
   FavoritesModal,
   HistoryModal,
   BeggingModal,
-  TaskGoalModal,
 } from "./components/Modals";
 
 const getStoredAccount = (): PlayerAccount | null => {
@@ -45,12 +38,6 @@ export default function App() {
   const [currentAccount, setCurrentAccount] = useState<PlayerAccount | null>(() => getStoredAccount());
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(() => !getStoredAccount());
 
-  // Checkbox Lists (Tasks & Goals)
-  const [studentTasks, setStudentTasks] = useState<Task[]>(DEFAULT_STUDENT_TASKS);
-  const [workerTasks, setWorkerTasks] = useState<Task[]>(DEFAULT_WORKER_TASKS);
-  const [studentGoals, setStudentGoals] = useState<LongTermGoal[]>(DEFAULT_STUDENT_GOALS);
-  const [workerGoals, setWorkerGoals] = useState<LongTermGoal[]>(DEFAULT_WORKER_GOALS);
-
   // Cloud Persistence / Local Storage lists
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -61,7 +48,6 @@ export default function App() {
   const [isFavoritesModalOpen, setIsFavoritesModalOpen] = useState(false);
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
   const [isBeggingModalOpen, setIsBeggingModalOpen] = useState(false);
-  const [isTaskGoalModalOpen, setIsTaskGoalModalOpen] = useState(false);
 
   // Initialize and load from local storage
   useEffect(() => {
@@ -90,18 +76,6 @@ export default function App() {
       const storedHours = localStorage.getItem("dw_user_hours");
       if (storedHours) setUserHours(Number(storedHours));
 
-      const storedStudentTasks = localStorage.getItem("dw_student_tasks");
-      if (storedStudentTasks) setStudentTasks(JSON.parse(storedStudentTasks));
-
-      const storedWorkerTasks = localStorage.getItem("dw_worker_tasks");
-      if (storedWorkerTasks) setWorkerTasks(JSON.parse(storedWorkerTasks));
-
-      const storedStudentGoals = localStorage.getItem("dw_student_goals");
-      if (storedStudentGoals) setStudentGoals(JSON.parse(storedStudentGoals));
-
-      const storedWorkerGoals = localStorage.getItem("dw_worker_goals");
-      if (storedWorkerGoals) setWorkerGoals(JSON.parse(storedWorkerGoals));
-
       const storedFavorites = localStorage.getItem("dw_favorites");
       if (storedFavorites) setFavorites(JSON.parse(storedFavorites));
 
@@ -121,92 +95,6 @@ export default function App() {
     }
   }, []);
 
-  // Sync to local storage handlers
-  const saveTasks = (newTasks: Task[], id: Identity) => {
-    if (id === "Student") {
-      setStudentTasks(newTasks);
-      localStorage.setItem("dw_student_tasks", JSON.stringify(newTasks));
-    } else {
-      setWorkerTasks(newTasks);
-      localStorage.setItem("dw_worker_tasks", JSON.stringify(newTasks));
-    }
-  };
-
-  const handleIdentityChange = (newId: Identity) => {
-    setIdentity(newId);
-    localStorage.setItem("dw_identity", newId);
-    
-    // Automatically match appropriate title class if user hasn't customized it
-    if (userName === "Alex 摸鱼大师" || userName === "无名牛马") {
-      if (newId === "Student") {
-        setUserName("Alex 摸鱼大师");
-        setUserTitle("学术逃生舱员");
-        setUserMotto("导师不找，绝不现身；导师一找，当场装死。");
-        localStorage.setItem("dw_user_name", "Alex 摸鱼大师");
-        localStorage.setItem("dw_user_title", "学术逃生舱员");
-        localStorage.setItem("dw_user_motto", "导师不找，绝不现身；导师一找，当场装死。");
-      } else {
-        setUserName("Alex 摸鱼大师");
-        setUserTitle("带薪拉屎专家");
-        setUserMotto("深耕于“高效休息”领域的艺术家");
-        localStorage.setItem("dw_user_name", "Alex 摸鱼大师");
-        localStorage.setItem("dw_user_title", "带薪拉屎专家");
-        localStorage.setItem("dw_user_motto", "深耕于“高效休息”领域的艺术家");
-      }
-    }
-  };
-
-  const handleToggleTask = (taskId: string) => {
-    const currentTasks = identity === "Student" ? studentTasks : workerTasks;
-    const updated = currentTasks.map((t) => 
-      t.id === taskId ? { ...t, completed: !t.completed } : t
-    );
-    saveTasks(updated, identity);
-  };
-
-  const handleAddTask = (text: string) => {
-    const currentTasks = identity === "Student" ? studentTasks : workerTasks;
-    const newTask: Task = {
-      id: `task_${Date.now()}`,
-      text,
-      completed: false,
-      isCustom: true,
-    };
-    const updated = [...currentTasks, newTask];
-    saveTasks(updated, identity);
-  };
-
-  const handleToggleGoal = (goalId: string) => {
-    const currentGoals = identity === "Student" ? studentGoals : workerGoals;
-    const updated = currentGoals.map((g) => 
-      g.id === goalId ? { ...g, completed: !g.completed } : g
-    );
-    if (identity === "Student") {
-      setStudentGoals(updated);
-      localStorage.setItem("dw_student_goals", JSON.stringify(updated));
-    } else {
-      setWorkerGoals(updated);
-      localStorage.setItem("dw_worker_goals", JSON.stringify(updated));
-    }
-  };
-
-  const handleAddGoal = (text: string) => {
-    const currentGoals = identity === "Student" ? studentGoals : workerGoals;
-    const newGoal: LongTermGoal = {
-      id: `goal_${Date.now()}`,
-      text,
-      completed: false,
-    };
-    const updated = [...currentGoals, newGoal];
-    if (identity === "Student") {
-      setStudentGoals(updated);
-      localStorage.setItem("dw_student_goals", JSON.stringify(updated));
-    } else {
-      setWorkerGoals(updated);
-      localStorage.setItem("dw_worker_goals", JSON.stringify(updated));
-    }
-  };
-
   const handleToggleMadness = () => {
     const nextVal = !isMadness;
     setIsMadness(nextVal);
@@ -216,6 +104,11 @@ export default function App() {
     } else {
       document.documentElement.classList.remove("madness-theme");
     }
+  };
+
+  const handleIdentityChange = (nextIdentity: Identity) => {
+    setIdentity(nextIdentity);
+    localStorage.setItem("dw_identity", nextIdentity);
   };
 
   const handleAuthenticated = (account: PlayerAccount) => {
@@ -322,7 +215,7 @@ export default function App() {
         }
       } catch (error) {
         console.error("Failed to delete account", error);
-        alert("注销账号失败，请稍后再试。");
+        alert("注销账号失败，绝对不是套路，请稍后再试。");
         return;
       }
     }
@@ -337,10 +230,6 @@ export default function App() {
     setUserTitle("学术逃生舱员");
     setUserMotto("导师不找，绝不现身；导师一找，当场装死。");
     setUserHours(42.5);
-    setStudentTasks(DEFAULT_STUDENT_TASKS);
-    setWorkerTasks(DEFAULT_WORKER_TASKS);
-    setStudentGoals(DEFAULT_STUDENT_GOALS);
-    setWorkerGoals(DEFAULT_WORKER_GOALS);
     setFavorites([]);
     setHistory([]);
     setActiveTab("tools");
@@ -351,7 +240,6 @@ export default function App() {
       case "tools":
         return (
           <TabTools
-            identity={identity}
             isMadness={isMadness}
             onOpenEnergyModal={() => setIsEnergyModalOpen(true)}
             onOpenTribunalModal={() => setIsTribunalModalOpen(true)}
@@ -371,6 +259,8 @@ export default function App() {
       case "my":
         return (
           <TabMy
+            identity={identity}
+            onIdentityChange={handleIdentityChange}
             userHours={userHours}
             userName={userName}
             userMotto={userMotto}
@@ -443,17 +333,6 @@ export default function App() {
         isOpen={isBeggingModalOpen}
         onClose={() => setIsBeggingModalOpen(false)}
         onDonate={(gift) => handleAddHistory("slack_session", `虚拟打赏成功: ${gift}`, `向作者投喂了 ${gift}`, { gift })}
-        isMadness={isMadness}
-      />
-
-      <TaskGoalModal
-        isOpen={isTaskGoalModalOpen}
-        onClose={() => setIsTaskGoalModalOpen(false)}
-        identity={identity}
-        tasks={identity === "Student" ? studentTasks : workerTasks}
-        goals={identity === "Student" ? studentGoals : workerGoals}
-        onToggleGoal={handleToggleGoal}
-        onAddGoal={handleAddGoal}
         isMadness={isMadness}
       />
 
