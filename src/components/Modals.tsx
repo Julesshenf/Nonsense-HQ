@@ -11,6 +11,34 @@ interface EnergyFieldModalProps {
   isMadness: boolean;
 }
 
+const normalizeEnergyFieldResult = (data: unknown): EnergyFieldResponse => {
+  const value = data && typeof data === "object" ? data as Record<string, unknown> : {};
+  const threatLevel = Number(value.threatLevel);
+  const survivalGuide = Array.isArray(value.survivalGuide)
+    ? value.survivalGuide.filter((item): item is string => typeof item === "string")
+    : [];
+
+  const isValid = typeof value.fieldType === "string" && value.fieldType.trim().length > 0
+    && Number.isFinite(threatLevel)
+    && typeof value.vibeRating === "string" && value.vibeRating.trim().length > 0
+    && typeof value.translation === "string" && value.translation.trim().length > 0
+    && survivalGuide.length > 0
+    && typeof value.slackingRisk === "string" && value.slackingRisk.trim().length > 0;
+
+  if (!isValid) {
+    throw new Error("AI returned an incomplete energy-field analysis");
+  }
+
+  return {
+    fieldType: value.fieldType as string,
+    threatLevel: Math.min(100, Math.max(0, threatLevel)),
+    vibeRating: value.vibeRating as string,
+    translation: value.translation as string,
+    survivalGuide,
+    slackingRisk: value.slackingRisk as string,
+  };
+};
+
 export const EnergyFieldModal: React.FC<EnergyFieldModalProps> = ({
   isOpen,
   onClose,
@@ -25,6 +53,7 @@ export const EnergyFieldModal: React.FC<EnergyFieldModalProps> = ({
   const [loadingMsg, setLoadingMsg] = useState("");
   const [result, setResult] = useState<EnergyFieldResponse | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const loadingMessages = [
     "正在分析导师/老板的本周画饼配方...",
@@ -58,6 +87,7 @@ export const EnergyFieldModal: React.FC<EnergyFieldModalProps> = ({
     setIsLoading(true);
     setResult(null);
     setIsSaved(false);
+    setErrorMessage("");
 
     try {
       const response = await fetch("/api/energy-field", {
@@ -72,38 +102,20 @@ export const EnergyFieldModal: React.FC<EnergyFieldModalProps> = ({
 
       const data = await response.json();
       if (response.ok) {
-        setResult(data);
+        const normalizedResult = normalizeEnergyFieldResult(data);
+        setResult(normalizedResult);
         onAddHistory(
           "energy",
-          data.fieldType,
-          `${identity === "Student" ? "导师" : "老板"}能量场分析: 危机指数 ${data.threatLevel}%`,
-          data
+          normalizedResult.fieldType,
+          `${identity === "Student" ? "导师" : "老板"}能量场分析: 危机指数 ${normalizedResult.threatLevel}%`,
+          normalizedResult
         );
       } else {
         throw new Error(data.error || "Request failed");
       }
     } catch (err) {
       console.error(err);
-      // Fallback mock data in case of error (e.g. no API key configured)
-      const mockResult: EnergyFieldResponse = {
-        fieldType: "量子画饼辐射结界",
-        threatLevel: 85,
-        vibeRating: "面露祥和之光，口吐宏伟蓝图，实则内心催逼度极高",
-        translation: `“你最近做的东西方向非常好（但我明天就要看到新一版），放手去干（但我随时会全盘否定你）。”`,
-        survivalGuide: [
-          "立刻在电脑桌旁放置一打打印好的论文或周报草稿，只要老板路过，就用手用力撑住额头作沉思状。",
-          "写一段极其复杂的自动化回复脚本，随机延迟10-15分钟回复，回复格式统一为：‘收到！点子太赞了，立刻推进！’",
-          "在工位放置一张空水杯，每小时往返茶水间接水12次，每次逗留不少于5分钟，合理消耗其视线。"
-        ],
-        slackingRisk: "目前摸鱼风险极大，对方正处于周报统计活跃期，建议采取‘隐形摸鱼法’：盯着空白表格发呆30分钟，表现出对架构深感忧虑。"
-      };
-      setResult(mockResult);
-      onAddHistory(
-        "energy",
-        mockResult.fieldType,
-        `${identity === "Student" ? "导师" : "老板"}能量场分析 (演示数据): 危机指数 ${mockResult.threatLevel}%`,
-        mockResult
-      );
+      setErrorMessage("这次 AI 没有生成有效的分析结果，请稍后重试。你的原话不会被替换成演示内容。");
     } finally {
       setIsLoading(false);
     }
@@ -237,6 +249,11 @@ export const EnergyFieldModal: React.FC<EnergyFieldModalProps> = ({
           ) : (
             /* Input Form View */
             <form onSubmit={handleSubmit} className="space-y-5">
+              {errorMessage && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {errorMessage}
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
                   输入{identity === "Student" ? "导师/学术顾问" : "老板/主管"}的近期发言 / 指示

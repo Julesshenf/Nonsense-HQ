@@ -3,7 +3,7 @@ import crypto from "crypto";
 import fs from "fs/promises";
 import path from "path";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
+import OpenAI from "openai";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -67,24 +67,80 @@ function hashPassword(password: string) {
   return crypto.createHash("sha256").update(password).digest("hex");
 }
 
-// Lazy initialize Gemini client safely
-let aiClient: GoogleGenAI | null = null;
-function getGeminiClient(): GoogleGenAI {
+const DEEPSEEK_MODEL = "deepseek-v3.2";
+const Type = {
+  OBJECT: "object",
+  STRING: "string",
+  INTEGER: "integer",
+  ARRAY: "array",
+} as const;
+
+interface DeepSeekContentRequest {
+  model?: string;
+  contents: string;
+  config?: {
+    systemInstruction?: string;
+    responseMimeType?: string;
+    responseSchema?: unknown;
+  };
+}
+
+interface DeepSeekAdapter {
+  models: {
+    generateContent(request: DeepSeekContentRequest): Promise<{ text: string | null }>;
+  };
+}
+
+// Lazy initialize the OpenAI-compatible Qianfan DeepSeek client.
+let aiClient: OpenAI | null = null;
+let deepSeekAdapter: DeepSeekAdapter | null = null;
+function getDeepSeekClient(): DeepSeekAdapter {
   if (!aiClient) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
+    const appId = process.env.APP_ID;
     if (!apiKey) {
-      console.warn("GEMINI_API_KEY is not defined. AI features will fail until a key is added.");
+      console.warn("API_KEY is not defined. AI features will fail until a key is added.");
     }
-    aiClient = new GoogleGenAI({
+    if (!appId) {
+      console.warn("APP_ID is not defined. Qianfan requests may fail until an app ID is added.");
+    }
+    aiClient = new OpenAI({
       apiKey: apiKey || "MOCK_KEY_PLACEHOLDER",
-      httpOptions: {
-        headers: {
-          "User-Agent": "aistudio-build",
-        },
-      },
+      baseURL: "https://qianfan.baidubce.com/v2",
+      defaultHeaders: { appid: appId || "" },
+      timeout: 30_000,
+      maxRetries: 1,
     });
   }
-  return aiClient;
+  if (!deepSeekAdapter) {
+    deepSeekAdapter = {
+      models: {
+        async generateContent(request) {
+          const response = await aiClient!.chat.completions.create({
+            model: DEEPSEEK_MODEL,
+            messages: [
+              {
+                role: "system",
+                content: `${request.config?.systemInstruction || "You are a helpful assistant."}
+Return only valid JSON. Do not use Markdown fences.
+The JSON must follow this schema exactly:
+${JSON.stringify(request.config?.responseSchema || {})}`,
+              },
+              { role: "user", content: request.contents },
+            ],
+          });
+          return { text: response.choices[0]?.message?.content ?? null };
+        },
+      },
+    };
+  }
+  return deepSeekAdapter;
+}
+
+function parseJsonResponse(content: string | null) {
+  if (!content) throw new Error("No response text returned from DeepSeek API");
+  const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  return JSON.parse((fenced?.[1] ?? content).trim());
 }
 
 app.get("/api/accounts/check", async (req, res) => {
@@ -244,17 +300,26 @@ app.post("/api/energy-field", async (req, res) => {
       return res.status(400).json({ error: "Missing required fields: quote and vibe" });
     }
 
-    const ai = getGeminiClient();
+    const ai = getDeepSeekClient();
     
     const prompt = `Analyze the "energy field" and subtext of a spoken statement from a ${identity === "Student" ? "Teacher / Academic Advisor" : "Boss / Corporate Manager"}.
 Statement: "${quote}"
 Observed Vibe/Behavior: "${vibe}"
 
 Analyze this thoroughly but with a highly relatable, sharp, humorous, and slightly satirical tone matching the "cow and horse" (牛马) demographic of stressed workers and students. Decipher what they *actually* mean, calculate the danger level, and give slacking (摸鱼) tips.
-Please output strictly in the requested JSON structure.`;
+Every conclusion must be based on the statement and observed vibe above. Do not invent unrelated events or replace the user's statement with an example.
+Return one JSON object with exactly these fields:
+{
+  "fieldType": "string",
+  "threatLevel": 0,
+  "vibeRating": "string",
+  "translation": "string",
+  "survivalGuide": ["string", "string", "string"],
+  "slackingRisk": "string"
+}`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: DEEPSEEK_MODEL,
       contents: prompt,
       config: {
         systemInstruction: "You are an expert slacking consultant and humorous workplace/academic advisor. You speak fluent Chinese, incorporating popular Chinese workplace/school slang (e.g. 牛马, 摸鱼, 薪水小偷, 画饼, 卷). Return highly structured, engaging responses.",
@@ -280,10 +345,20 @@ Please output strictly in the requested JSON structure.`;
 
     const resultText = response.text;
     if (!resultText) {
-      throw new Error("No response text returned from Gemini API");
+      throw new Error("No response text returned from DeepSeek API");
     }
 
-    const data = JSON.parse(resultText);
+    const data = parseJsonResponse(resultText);
+    const requiredTextFields = ["fieldType", "vibeRating", "translation", "slackingRisk"];
+    const hasValidShape = data
+      && requiredTextFields.every((field) => typeof data[field] === "string" && data[field].trim())
+      && Number.isFinite(Number(data.threatLevel))
+      && Array.isArray(data.survivalGuide)
+      && data.survivalGuide.length > 0
+      && data.survivalGuide.every((item: unknown) => typeof item === "string");
+    if (!hasValidShape) {
+      throw new Error("AI returned an incomplete energy-field analysis");
+    }
     res.json(data);
   } catch (error: any) {
     console.error("Error in /api/energy-field:", error);
@@ -314,7 +389,7 @@ app.post("/api/tribunal", async (req, res) => {
       return res.status(400).json({ error: "Missing required field: incident" });
     }
 
-    const ai = getGeminiClient();
+    const ai = getDeepSeekClient();
 
     const prompt = `Act as the Supreme Judge of the "Small Things Tribunal" (小事审判庭), a court dedicated to rendering majestic, hilarious, and dramatically over-the-top justice for the trivial, annoying incidents of daily school and office grind.
 Incident: "${incident}"
@@ -324,7 +399,7 @@ Judge this incident with extreme theatrical grandeur. Declare the offender guilt
 Please output strictly in the requested JSON structure.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: DEEPSEEK_MODEL,
       contents: prompt,
       config: {
         systemInstruction: "You are the Dramatic Supreme Judge of the Small Things Tribunal. You speak majestic, hilarious, classical-meets-modern Chinese courtroom jargon. You sentence offenders to absurd, satisfyingly cruel modern punishments (e.g., debugging raw binary with a quill pen, listening to elevator jazz for 72 hours, writing PPT slide transitions with scissors).",
@@ -347,10 +422,10 @@ Please output strictly in the requested JSON structure.`;
 
     const resultText = response.text;
     if (!resultText) {
-      throw new Error("No response text returned from Gemini API");
+      throw new Error("No response text returned from DeepSeek API");
     }
 
-    const data = JSON.parse(resultText);
+    const data = parseJsonResponse(resultText);
     res.json(data);
   } catch (error: any) {
     console.error("Error in /api/tribunal:", error);

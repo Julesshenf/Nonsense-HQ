@@ -18,7 +18,7 @@ An interactive emotional catharsis and slacking companion for high-pressure stud
 - Vite
 - Tailwind CSS
 - Express
-- Gemini API integration
+- DeepSeek API integration through Baidu Qianfan's OpenAI-compatible endpoint
 
 ## Run Locally
 
@@ -30,7 +30,7 @@ Prerequisites: Node.js.
    npm install
    ```
 
-2. Create `.env.local` from `.env.example` and set your Gemini API key.
+2. Create `.env.local` from `.env.example` and set your Qianfan `API_KEY` and `APP_ID`.
 
 3. Start the dev server:
 
