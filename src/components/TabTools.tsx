@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Identity, VentingMessage } from "../types";
 import { BOSS_VIBES, VENT_BACKGROUND_COMMENTS } from "../data";
 import { LuckyWheel, FingerCalculator, RelationshipCalculator, GenderPredictor } from "./ExtraTools";
@@ -7,8 +8,23 @@ type BulletMessage = VentingMessage & {
   paused?: boolean;
 };
 
+const getRandomBulletColor = () => {
+  const colors = [
+    "bg-rose-500/15 text-rose-300",
+    "bg-orange-500/15 text-orange-300",
+    "bg-yellow-500/15 text-yellow-300",
+    "bg-cyan-500/15 text-cyan-300",
+    "bg-blue-500/15 text-blue-300",
+    "bg-violet-500/15 text-violet-300",
+    "bg-pink-500/15 text-pink-300",
+    "bg-emerald-500/15 text-emerald-300",
+  ];
+
+  return colors[Math.floor(Math.random() * colors.length)];
+};
+
 interface TabToolsProps {
-  identity: Identity;
+  identity?: Identity;
   isMadness: boolean;
   onOpenEnergyModal: () => void;
   onOpenTribunalModal: () => void;
@@ -17,7 +33,6 @@ interface TabToolsProps {
 }
 
 export const TabTools: React.FC<TabToolsProps> = ({
-  identity,
   isMadness,
   onOpenEnergyModal,
   onOpenTribunalModal,
@@ -50,6 +65,9 @@ export const TabTools: React.FC<TabToolsProps> = ({
   const [bullets, setBullets] = useState<BulletMessage[]>([]);
   const [selectedBulletId, setSelectedBulletId] = useState<string | null>(null);
   const [editingBulletText, setEditingBulletText] = useState("");
+  const [isBulletWallOpen, setIsBulletWallOpen] = useState(false);
+  const [bulletMode, setBulletMode] = useState<"wall" | "sky">("wall");
+  const [isBulletModeMenuOpen, setIsBulletModeMenuOpen] = useState(false);
 
   // Initialize initial mock bullet messages
   useEffect(() => {
@@ -59,7 +77,7 @@ export const TabTools: React.FC<TabToolsProps> = ({
       timestamp: Date.now(),
       x: 10 + Math.random() * 80,
       y: 10 + (idx * 9) % 80, // spaced vertically
-      color: getRandomColor(),
+      color: `${getRandomBulletColor()} font-bold`,
       speed: 0.5 + Math.random() * 0.8,
     }));
     setBullets(initialBullets);
@@ -68,9 +86,27 @@ export const TabTools: React.FC<TabToolsProps> = ({
   // Bullet drift animation runner
   useEffect(() => {
     const interval = setInterval(() => {
+      const tick = Date.now();
       setBullets((prevBullets) =>
-        prevBullets.map((b) => {
+        prevBullets.map((b, index) => {
           if (b.paused) return b;
+
+          if (bulletMode === "sky") {
+            let newY = b.y - b.speed * 0.22;
+            let newX = b.x + Math.sin(tick / 700 + index * 1.7) * 0.07;
+
+            if (newY < -12) {
+              newY = 100;
+              newX = 10 + Math.random() * 80;
+            }
+
+            return {
+              ...b,
+              x: Math.max(2, Math.min(95, newX)),
+              y: newY,
+            };
+          }
+
           let newX = b.x - b.speed;
           if (newX < -30) {
             // wrap around to the right
@@ -81,21 +117,7 @@ export const TabTools: React.FC<TabToolsProps> = ({
       );
     }, 50);
     return () => clearInterval(interval);
-  }, []);
-
-  const getRandomColor = () => {
-    const colors = [
-      "text-red-400",
-      "text-orange-400",
-      "text-yellow-400",
-      "text-blue-400",
-      "text-purple-400",
-      "text-pink-400",
-      "text-emerald-400",
-      "text-indigo-400",
-    ];
-    return colors[Math.floor(Math.random() * colors.length)];
-  };
+  }, [bulletMode]);
 
   const primaryEmotions = [
     {
@@ -195,9 +217,9 @@ export const TabTools: React.FC<TabToolsProps> = ({
       id: `user_${Date.now()}`,
       text: ventText.trim(),
       timestamp: Date.now(),
-      x: 100, // starts offscreen right
-      y: 10 + Math.random() * 75,
-      color: isMadness ? "text-red-500 font-extrabold" : getRandomColor() + " font-bold",
+      x: bulletMode === "sky" ? 10 + Math.random() * 80 : 100,
+      y: bulletMode === "sky" ? 100 : 10 + Math.random() * 75,
+      color: `${getRandomBulletColor()} font-bold`,
       speed: 1.2 + Math.random() * 1.5,
     };
 
@@ -235,6 +257,15 @@ export const TabTools: React.FC<TabToolsProps> = ({
     setEditingBulletText("");
   };
 
+  const handleClearBullets = () => {
+    if (bullets.length === 0) return;
+    if (!window.confirm("确定要清空全部弹幕吗？")) return;
+
+    setBullets([]);
+    setSelectedBulletId(null);
+    setEditingBulletText("");
+  };
+
   const handleCancelBulletEdit = () => {
     if (selectedBulletId) {
       setBullets((prev) =>
@@ -246,6 +277,43 @@ export const TabTools: React.FC<TabToolsProps> = ({
     setSelectedBulletId(null);
     setEditingBulletText("");
   };
+
+  const handleCloseBulletWall = () => {
+    handleCancelBulletEdit();
+    setIsBulletModeMenuOpen(false);
+    setIsBulletWallOpen(false);
+  };
+
+  const handleBulletModeChange = (mode: "wall" | "sky") => {
+    handleCancelBulletEdit();
+    setBullets((currentBullets) =>
+      currentBullets.map((bullet, index) => ({
+        ...bullet,
+        paused: false,
+        x: mode === "sky" ? 8 + (index * 13) % 84 : 100 + (index % 6) * 14,
+        y: mode === "sky" ? 100 + (index % 6) * 10 : 8 + (index * 11) % 78,
+      }))
+    );
+    setBulletMode(mode);
+    setIsBulletModeMenuOpen(false);
+  };
+
+  useEffect(() => {
+    if (!isBulletWallOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") handleCloseBulletWall();
+    };
+
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isBulletWallOpen, selectedBulletId]);
 
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, "0");
@@ -327,106 +395,8 @@ export const TabTools: React.FC<TabToolsProps> = ({
   );
 
   return (
-    <div className="relative isolate space-y-6 animate-fade-in pb-12 md:grid md:grid-cols-[minmax(420px,560px)_minmax(320px,420px)] md:items-start md:gap-6 md:space-y-0">
-      <section className="fixed inset-0 -z-10 hidden bg-gray-950 overflow-hidden select-none md:block" aria-label="弹幕墙">
-        <div className="absolute left-4 top-20 z-10 flex items-center gap-1.5 rounded-full bg-black/40 px-3 py-1.5 text-xs font-bold text-white/70 backdrop-blur-sm">
-          <span className="material-symbols-outlined text-sm text-orange-300">forum</span>
-          弹幕墙
-        </div>
-        <div className="absolute inset-0 bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950 pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.12),transparent_28%),radial-gradient(circle_at_80%_30%,rgba(244,63,94,0.12),transparent_26%)] pointer-events-none" />
-
-        {bullets.map((bullet) => (
-          <button
-            key={bullet.id}
-            type="button"
-            onClick={() => handleBulletClick(bullet)}
-            className={`absolute z-10 max-w-[70vw] truncate text-[12px] whitespace-nowrap rounded-full px-2 py-1 text-left transition-all duration-75 select-none cursor-pointer hover:bg-white/10 hover:scale-105 ${
-              bullet.paused ? "bg-white/15 ring-1 ring-white/40" : ""
-            } ${bullet.color}`}
-            style={{
-              left: `${bullet.x}%`,
-              top: `${bullet.y}%`,
-              textShadow: "1px 1px 2px rgba(0,0,0,0.85)",
-            }}
-            title="点击暂停并编辑弹幕"
-          >
-            {bullet.text}
-          </button>
-        ))}
-
-        {bullets.length === 0 && (
-          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white/40">
-            弹幕墙空了，右下角写一条吧。
-          </div>
-        )}
-      </section>
-
-      <form
-        onSubmit={selectedBullet ? (e) => { e.preventDefault(); handleSaveBullet(); } : handleVentSubmit}
-        className="z-40 hidden w-full rounded-2xl border border-white/20 bg-white/90 p-3 shadow-2xl backdrop-blur-xl md:sticky md:top-24 md:col-start-2 md:row-start-1 md:block"
-      >
-        {selectedBullet ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-gray-500">正在编辑已暂停弹幕</span>
-              <button
-                type="button"
-                onClick={handleCancelBulletEdit}
-                className="h-7 w-7 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                title="取消"
-              >
-                <span className="material-symbols-outlined text-base">close</span>
-              </button>
-            </div>
-            <input
-              type="text"
-              required
-              value={editingBulletText}
-              onChange={(e) => setEditingBulletText(e.target.value)}
-              maxLength={60}
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={handleDeleteBullet}
-                className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 active:scale-95"
-              >
-                删除弹幕
-              </button>
-              <button
-                type="submit"
-                className={`rounded-xl px-3 py-2 text-xs font-bold text-white active:scale-95 ${isMadness ? "bg-red-600" : "bg-blue-600"}`}
-              >
-                保存弹幕
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="flex gap-2">
-            <input
-              type="text"
-              required
-              value={ventText}
-              onChange={(e) => setVentText(e.target.value)}
-              placeholder="写一条弹幕..."
-              maxLength={60}
-              className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-            <button
-              type="submit"
-              className={`shrink-0 rounded-xl px-4 text-xs font-bold text-white transition-all active:scale-95 ${
-                isMadness ? "bg-red-600" : "bg-blue-600"
-              }`}
-            >
-              发送
-            </button>
-          </div>
-        )}
-      </form>
-
-      <div className="space-y-6 md:col-start-1 md:row-start-1">
+    <div className="mx-auto w-full max-w-5xl space-y-6 pb-12 animate-fade-in">
+      {/* 第一行：心情选择 */}
       <section className="glass-card rounded-3xl p-5 shadow-sm border border-gray-100 space-y-4">
         <div className="text-center">
           <h2 className="font-display text-2xl text-gray-800 italic font-semibold">
@@ -490,107 +460,62 @@ export const TabTools: React.FC<TabToolsProps> = ({
         )}
       </section>
 
-      <section className="glass-card rounded-3xl border border-gray-100 p-5 shadow-sm md:hidden">
-        <h3 className="mb-3 flex items-center gap-1.5 text-base font-bold text-gray-800">
-          <span className="material-symbols-outlined text-orange-500">forum</span>
-          弹幕墙
+      {/* 第二行：AI 检测工具 */}
+      <section className="glass-card space-y-4 rounded-3xl border border-gray-100 p-4 shadow-sm sm:p-5">
+        <h3 className="flex items-center gap-1.5 text-base font-bold text-gray-800">
+          <span className="material-symbols-outlined text-amber-500">neurology</span>
+          量子 AI 诊断专区
         </h3>
 
-        <div className="relative h-56 w-full overflow-hidden rounded-2xl border border-gray-950 bg-gray-900 select-none">
-          <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-gray-950/20 via-transparent to-gray-950/20" />
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={onOpenEnergyModal}
+            className="group rounded-2xl border border-orange-100 bg-orange-50/70 p-4 text-left transition-all hover:bg-orange-50 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined mb-1 text-2xl text-orange-600 transition-transform group-hover:scale-110">
+              bolt
+            </span>
+            <span className="block text-xs font-bold text-gray-800">能量场检测</span>
+            <span className="mt-0.5 block text-[10px] text-gray-500">解码导师/老板黑话与危险系数</span>
+          </button>
 
-          {bullets.map((bullet) => (
-            <button
-              key={bullet.id}
-              type="button"
-              onClick={() => handleBulletClick(bullet)}
-              className={`absolute z-20 max-w-[75%] truncate rounded-full px-2 py-1 text-left text-[11px] whitespace-nowrap transition-all duration-75 hover:bg-white/10 ${
-                bullet.paused ? "bg-white/15 ring-1 ring-white/40" : ""
-              } ${bullet.color}`}
-              style={{
-                left: `${bullet.x}%`,
-                top: `${bullet.y}%`,
-                textShadow: "1px 1px 2px rgba(0,0,0,0.8)",
-              }}
-              title="点击暂停并编辑弹幕"
-            >
-              {bullet.text}
-            </button>
-          ))}
-
-          {bullets.length === 0 && (
-            <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-500">
-              弹幕墙空了，写下第一条心声吧。
-            </div>
-          )}
+          <button
+            type="button"
+            onClick={onOpenTribunalModal}
+            className="group rounded-2xl border border-purple-100 bg-purple-50/70 p-4 text-left transition-all hover:bg-purple-50 active:scale-[0.98]"
+          >
+            <span className="material-symbols-outlined mb-1 text-2xl text-purple-600 transition-transform group-hover:scale-110">
+              gavel
+            </span>
+            <span className="block text-xs font-bold text-gray-800">小事审判庭</span>
+            <span className="mt-0.5 block text-[10px] text-gray-500">宣判琐碎矛盾，舒缓压力</span>
+          </button>
         </div>
-
-        <form
-          onSubmit={selectedBullet ? (e) => { e.preventDefault(); handleSaveBullet(); } : handleVentSubmit}
-          className="mt-3"
-        >
-          {selectedBullet ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-gray-500">正在编辑已暂停弹幕</span>
-                <button
-                  type="button"
-                  onClick={handleCancelBulletEdit}
-                  className="h-7 w-7 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                  title="取消"
-                >
-                  <span className="material-symbols-outlined text-base">close</span>
-                </button>
-              </div>
-              <input
-                type="text"
-                required
-                value={editingBulletText}
-                onChange={(e) => setEditingBulletText(e.target.value)}
-                maxLength={60}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={handleDeleteBullet}
-                  className="rounded-xl border border-red-100 bg-red-50 px-3 py-2 text-xs font-bold text-red-600 active:scale-95"
-                >
-                  删除弹幕
-                </button>
-                <button
-                  type="submit"
-                  className={`rounded-xl px-3 py-2 text-xs font-bold text-white active:scale-95 ${isMadness ? "bg-red-600" : "bg-blue-600"}`}
-                >
-                  保存弹幕
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <input
-                type="text"
-                required
-                value={ventText}
-                onChange={(e) => setVentText(e.target.value)}
-                placeholder="写一条弹幕..."
-                maxLength={60}
-                className="min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-3 py-2 text-xs font-semibold outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              />
-              <button
-                type="submit"
-                className={`shrink-0 rounded-xl px-4 text-xs font-bold text-white transition-all active:scale-95 ${
-                  isMadness ? "bg-red-600" : "bg-blue-600"
-                }`}
-              >
-                发送
-              </button>
-            </div>
-          )}
-        </form>
       </section>
 
-      {/* 趣味解压工具箱 */}
+      {/* 第三行：弹幕 */}
+      <button
+        type="button"
+        onClick={() => setIsBulletWallOpen(true)}
+        className="group relative w-full overflow-hidden rounded-3xl border border-gray-100 bg-white p-5 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-md active:scale-[0.99]"
+      >
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(59,130,246,0.08),transparent_32%),radial-gradient(circle_at_85%_70%,rgba(244,63,94,0.07),transparent_30%)]" />
+        <div className="relative flex items-center justify-between gap-4">
+          <div>
+            <h3 className="flex items-center gap-2 text-base font-bold text-gray-800">
+              <span className="material-symbols-outlined text-orange-500">forum</span>
+              弹幕墙
+            </h3>
+            <p className="mt-1 text-xs text-gray-500">点击进入全屏弹幕，把情绪扔进人海</p>
+          </div>
+          <span className="material-symbols-outlined rounded-full bg-blue-50 p-2 text-blue-600 transition-transform group-hover:translate-x-1">
+            arrow_forward
+          </span>
+        </div>
+      </button>
+
+      {/* 第四行：解压工具箱 */}
       <section className="glass-card rounded-3xl p-5 shadow-sm border border-gray-100 space-y-4">
         <div className="flex justify-between items-center pb-2 border-b border-gray-100">
           <h3 className="text-base font-bold text-gray-800 flex items-center gap-1.5">
@@ -681,35 +606,184 @@ export const TabTools: React.FC<TabToolsProps> = ({
         </div>
       </section>
 
-      {/* Quick Access to AI tools */}
-      <section className="space-y-3">
-        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider block">量子AI诊断专区</h4>
-        
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={onOpenEnergyModal}
-            className="p-4 bg-orange-50/70 hover:bg-orange-50 border border-orange-100 text-left rounded-2xl transition-all cursor-pointer group active:scale-98"
-          >
-            <span className="material-symbols-outlined text-2xl text-orange-600 mb-1 group-hover:scale-110 transition-transform">
-              bolt
-            </span>
-            <span className="text-xs font-bold text-gray-800 block">能量场检测</span>
-            <span className="text-[10px] text-gray-500 block mt-0.5">解码导师黑话与危险系数</span>
-          </button>
+      {isBulletWallOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex flex-col overflow-hidden bg-gray-950" role="dialog" aria-modal="true" aria-label="全屏弹幕墙">
+          <div className="relative min-h-0 flex-1 overflow-hidden select-none">
+            <div className={`pointer-events-none absolute inset-0 transition-colors duration-500 ${
+              bulletMode === "sky"
+                ? "bg-gradient-to-b from-sky-950 via-blue-950 to-indigo-950"
+                : "bg-gradient-to-b from-gray-950 via-gray-900 to-gray-950"
+            }`} />
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.16),transparent_30%),radial-gradient(circle_at_80%_35%,rgba(244,63,94,0.16),transparent_28%)]" />
 
-          <button
-            onClick={onOpenTribunalModal}
-            className="p-4 bg-purple-50/70 hover:bg-purple-50 border border-purple-100 text-left rounded-2xl transition-all cursor-pointer group active:scale-98"
+            <div className="absolute left-4 top-4 z-40 sm:left-6 sm:top-6">
+              <button
+                type="button"
+                aria-expanded={isBulletModeMenuOpen}
+                onClick={() => setIsBulletModeMenuOpen((open) => !open)}
+                className="flex h-10 items-center gap-1.5 rounded-full bg-black/45 px-3 text-xs font-bold text-white/80 backdrop-blur-sm transition-all hover:bg-white/15 hover:text-white"
+              >
+                <span className={`material-symbols-outlined text-base ${bulletMode === "sky" ? "text-sky-300" : "text-orange-300"}`}>
+                  {bulletMode === "sky" ? "cloud" : "forum"}
+                </span>
+                {bulletMode === "sky" ? "天空" : "弹幕墙"}
+                <span className={`material-symbols-outlined text-base transition-transform ${isBulletModeMenuOpen ? "rotate-180" : ""}`}>
+                  expand_more
+                </span>
+              </button>
+
+              {isBulletModeMenuOpen && (
+                <div className="mt-2 w-48 overflow-hidden rounded-2xl border border-white/10 bg-gray-950/90 p-1.5 shadow-2xl backdrop-blur-xl animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={() => handleBulletModeChange("wall")}
+                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      bulletMode === "wall" ? "bg-white/15 text-white" : "text-white/65 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg text-orange-300">forum</span>
+                    <span>
+                      <span className="block text-xs font-bold">弹幕墙</span>
+                      <span className="block text-[10px] text-white/40">横向飘过</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBulletModeChange("sky")}
+                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                      bulletMode === "sky" ? "bg-sky-500/20 text-white" : "text-white/65 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-lg text-sky-300">cloud</span>
+                    <span>
+                      <span className="block text-xs font-bold">天空</span>
+                      <span className="block text-[10px] text-white/40">向上飞，轻微左右漂移</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="absolute right-4 top-4 z-40 flex items-center gap-2 sm:right-6 sm:top-6">
+              <button
+                type="button"
+                onClick={handleClearBullets}
+                disabled={bullets.length === 0}
+                className="flex h-10 items-center gap-1 rounded-full bg-black/45 px-3 text-xs font-bold text-white/80 backdrop-blur-sm transition-all hover:bg-red-500/30 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                title="清空全部弹幕"
+              >
+                <span className="material-symbols-outlined text-lg">delete_sweep</span>
+                清空
+              </button>
+              <button
+                type="button"
+                onClick={handleCloseBulletWall}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm transition-all hover:bg-white/20 active:scale-90"
+                title="关闭弹幕墙"
+                aria-label="关闭弹幕墙"
+              >
+                <span className="material-symbols-outlined text-2xl">close</span>
+              </button>
+            </div>
+
+            {bullets.map((bullet) => (
+              <button
+                key={bullet.id}
+                type="button"
+                onClick={() => handleBulletClick(bullet)}
+                className={`absolute z-20 overflow-hidden rounded-full px-2 py-1 text-left text-xs whitespace-nowrap transition-all duration-75 hover:bg-white/10 sm:text-sm ${
+                  bulletMode === "sky" ? "max-h-[70vh] max-w-none" : "max-w-[80vw] truncate"
+                } ${
+                  bullet.paused ? "bg-white/15 ring-1 ring-white/40" : ""
+                } ${bullet.color}`}
+                style={{
+                  left: `${bullet.x}%`,
+                  top: `${bullet.y}%`,
+                  textShadow: "1px 1px 3px rgba(0,0,0,0.9)",
+                  writingMode: bulletMode === "sky" ? "vertical-rl" : "horizontal-tb",
+                  textOrientation: bulletMode === "sky" ? "upright" : "mixed",
+                }}
+                title="点击暂停并编辑弹幕"
+              >
+                {bullet.text}
+              </button>
+            ))}
+
+            {bullets.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white/35">
+                弹幕墙空了，写下第一条心声吧。
+              </div>
+            )}
+          </div>
+
+          <form
+            onSubmit={selectedBullet ? (event) => { event.preventDefault(); handleSaveBullet(); } : handleVentSubmit}
+            className="safe-bottom relative z-40 shrink-0 border-t border-white/10 bg-gray-950/95 p-3 backdrop-blur-xl sm:p-4"
           >
-            <span className="material-symbols-outlined text-2xl text-purple-600 mb-1 group-hover:scale-110 transition-transform">
-              gavel
-            </span>
-            <span className="text-xs font-bold text-gray-800 block">小事法官</span>
-            <span className="text-[10px] text-gray-500 block mt-0.5">宣判琐碎矛盾，舒缓压力</span>
-          </button>
-        </div>
-      </section>
-      </div>
+            <div className="mx-auto w-full max-w-3xl">
+              {selectedBullet ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-white/55">正在编辑已暂停弹幕</span>
+                    <button
+                      type="button"
+                      onClick={handleCancelBulletEdit}
+                      className="flex h-7 w-7 items-center justify-center rounded-full text-white/50 hover:bg-white/10 hover:text-white"
+                      title="取消编辑"
+                    >
+                      <span className="material-symbols-outlined text-base">close</span>
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={editingBulletText}
+                    onChange={(event) => setEditingBulletText(event.target.value)}
+                    maxLength={60}
+                    className="w-full rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm font-semibold text-white outline-none placeholder:text-white/30 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={handleDeleteBullet}
+                      className="rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2.5 text-xs font-bold text-red-300 active:scale-95"
+                    >
+                      删除弹幕
+                    </button>
+                    <button
+                      type="submit"
+                      className={`rounded-xl px-3 py-2.5 text-xs font-bold text-white active:scale-95 ${isMadness ? "bg-red-600" : "bg-blue-600"}`}
+                    >
+                      保存弹幕
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    value={ventText}
+                    onChange={(event) => setVentText(event.target.value)}
+                    placeholder="写一条弹幕..."
+                    maxLength={60}
+                    className="min-w-0 flex-1 rounded-xl border border-white/15 bg-white/10 px-3 py-3 text-sm font-semibold text-white outline-none placeholder:text-white/35 focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+                  />
+                  <button
+                    type="submit"
+                    className={`shrink-0 rounded-xl px-5 text-sm font-bold text-white transition-all active:scale-95 ${
+                      isMadness ? "bg-red-600" : "bg-blue-600"
+                    }`}
+                  >
+                    发送
+                  </button>
+                </div>
+              )}
+            </div>
+          </form>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };
