@@ -67,7 +67,7 @@ function hashPassword(password: string) {
   return crypto.createHash("sha256").update(password).digest("hex");
 }
 
-const DEEPSEEK_MODEL = "deepseek-v3.2";
+const DEEPSEEK_MODEL = "deepseek-v4-flash";
 const Type = {
   OBJECT: "object",
   STRING: "string",
@@ -81,7 +81,7 @@ interface DeepSeekContentRequest {
   config?: {
     systemInstruction?: string;
     responseMimeType?: string;
-    responseSchema?: unknown;
+    responseSchema?: Record<string, unknown>;
   };
 }
 
@@ -108,28 +108,63 @@ function getDeepSeekClient(): DeepSeekAdapter {
       apiKey: apiKey || "MOCK_KEY_PLACEHOLDER",
       baseURL: "https://qianfan.baidubce.com/v2",
       defaultHeaders: { appid: appId || "" },
-      timeout: 30_000,
-      maxRetries: 1,
     });
   }
   if (!deepSeekAdapter) {
     deepSeekAdapter = {
       models: {
         async generateContent(request) {
-          const response = await aiClient!.chat.completions.create({
-            model: DEEPSEEK_MODEL,
-            messages: [
-              {
-                role: "system",
-                content: `${request.config?.systemInstruction || "You are a helpful assistant."}
+          const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+            {
+              role: "system",
+              content: `${request.config?.systemInstruction || "You are a helpful assistant."}
 Return only valid JSON. Do not use Markdown fences.
 The JSON must follow this schema exactly:
 ${JSON.stringify(request.config?.responseSchema || {})}`,
-              },
-              { role: "user", content: request.contents },
-            ],
-          });
-          return { text: response.choices[0]?.message?.content ?? null };
+            },
+            { role: "user", content: request.contents },
+          ];
+          const responseFormat = request.config?.responseSchema
+            ? {
+                type: "json_schema" as const,
+                json_schema: {
+                  name: "structured_response",
+                  strict: true,
+                  schema: request.config.responseSchema,
+                },
+              }
+            : request.config?.responseMimeType === "application/json"
+              ? { type: "json_object" as const }
+              : undefined;
+
+          // Structured output should already be valid JSON. Retry once with the
+          // invalid response in context in case the provider still violates it.
+          for (let attempt = 0; attempt < 2; attempt += 1) {
+            const response = await aiClient!.chat.completions.create({
+              model: request.model || DEEPSEEK_MODEL,
+              messages,
+              response_format: responseFormat,
+            });
+            const text = response.choices[0]?.message?.content ?? null;
+
+            try {
+              parseJsonResponse(text);
+              return { text };
+            } catch (error) {
+              if (attempt === 1 || !text) {
+                throw error;
+              }
+              messages.push(
+                { role: "assistant", content: text },
+                {
+                  role: "user",
+                  content: "Your previous response was not valid JSON. Regenerate the complete answer as one valid JSON object that exactly matches the required schema. Do not add commentary or Markdown.",
+                },
+              );
+            }
+          }
+
+          throw new Error("DeepSeek failed to generate valid JSON");
         },
       },
     };
@@ -140,7 +175,22 @@ ${JSON.stringify(request.config?.responseSchema || {})}`,
 function parseJsonResponse(content: string | null) {
   if (!content) throw new Error("No response text returned from DeepSeek API");
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  return JSON.parse((fenced?.[1] ?? content).trim());
+  let candidate = (fenced?.[1] ?? content).replace(/^\uFEFF/, "").trim();
+
+  // Tolerate harmless prose around an otherwise valid JSON object. This does
+  // not attempt to guess or mutate malformed field values.
+  const objectStart = candidate.indexOf("{");
+  const objectEnd = candidate.lastIndexOf("}");
+  if (objectStart >= 0 && objectEnd > objectStart) {
+    candidate = candidate.slice(objectStart, objectEnd + 1);
+  }
+
+  try {
+    return JSON.parse(candidate);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new SyntaxError(`DeepSeek returned invalid JSON: ${message}`);
+  }
 }
 
 app.get("/api/accounts/check", async (req, res) => {
@@ -301,7 +351,7 @@ app.post("/api/energy-field", async (req, res) => {
     }
 
     const ai = getDeepSeekClient();
-    
+
     const prompt = `Analyze the "energy field" and subtext of a spoken statement from a ${identity === "Student" ? "Teacher / Academic Advisor" : "Boss / Corporate Manager"}.
 Statement: "${quote}"
 Observed Vibe/Behavior: "${vibe}"
@@ -322,18 +372,21 @@ Return one JSON object with exactly these fields:
       model: DEEPSEEK_MODEL,
       contents: prompt,
       config: {
-        systemInstruction: "You are an expert slacking consultant and humorous workplace/academic advisor. You speak fluent Chinese, incorporating popular Chinese workplace/school slang (e.g. 牛马, 摸鱼, 薪水小偷, 画饼, 卷). Return highly structured, engaging responses.",
+        systemInstruction: "你是一名专业的摸鱼顾问及幽默职场/学术导师。你精通中文，并熟练运用中国职场与校园流行语（如：牛马、摸鱼、薪水小偷、画饼、卷）。你的回复需具备高度结构化且引人入胜的特质。",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
+          additionalProperties: false,
           properties: {
             fieldType: { type: Type.STRING, description: "Humorous, exaggerated name of the boss/teacher's energy field (e.g., '无缝压榨防御结界', 'PPT终极画饼风暴')" },
-            threatLevel: { type: Type.INTEGER, description: "Danger/Threat level for the worker/student from 0 to 100" },
+            threatLevel: { type: Type.INTEGER, minimum: 0, maximum: 100, description: "Danger/Threat level for the worker/student from 0 to 100" },
             vibeRating: { type: Type.STRING, description: "A witty, sarcastic summary rating of their actual mood/vibe" },
             translation: { type: Type.STRING, description: "The cynical, real translation of what they actually mean (what lies behind their words)" },
             survivalGuide: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
+              minItems: 3,
+              maxItems: 3,
               description: "3 highly actionable, hilarious tips to survive this wave of energy (how to answer, how to pretend to be busy, or how to safely slack off)"
             },
             slackingRisk: { type: Type.STRING, description: "A funny, dramatic advisory or prediction on what happens if you attempt to slack off right now" }
@@ -402,17 +455,18 @@ Please output strictly in the requested JSON structure.`;
       model: DEEPSEEK_MODEL,
       contents: prompt,
       config: {
-        systemInstruction: "You are the Dramatic Supreme Judge of the Small Things Tribunal. You speak majestic, hilarious, classical-meets-modern Chinese courtroom jargon. You sentence offenders to absurd, satisfyingly cruel modern punishments (e.g., debugging raw binary with a quill pen, listening to elevator jazz for 72 hours, writing PPT slide transitions with scissors).",
+        systemInstruction: "你是“小事审判庭”的戏剧性法官。你使用一种融合古典威严（但不用用太多古风句子）与现代幽默的法庭术语，对违规者判处荒诞且令人痛快的现代刑罚（例如：用羽毛笔调试原始二进制代码、连续72小时聆听电梯背景音乐、用剪刀制作PPT幻灯片切换效果）。",
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
+          additionalProperties: false,
           properties: {
             caseName: { type: Type.STRING, description: "Grand, theatrical legal title of the case (e.g., '冷藏室牛奶不翼而飞重大侵害案', '微信群已阅不回特大冷漠罪')" },
             defendant: { type: Type.STRING, description: "Who or what is the defendant (e.g., '不知名的冷藏室盗贼', '微信群里假装没看见的群成员')" },
             crime: { type: Type.STRING, description: "The exaggerated crime description using dramatic legal-satirical words" },
             verdict: { type: Type.STRING, description: "The grand guilty declaration and general indictment" },
             sentence: { type: Type.STRING, description: "A highly creative, custom-designed, hilarious and absurd punishment for the offender" },
-            catharsisIndex: { type: Type.INTEGER, description: "Emotional healing/catharsis rating for the user, from 0 to 100" },
+            catharsisIndex: { type: Type.INTEGER, minimum: 0, maximum: 100, description: "Emotional healing/catharsis rating for the user, from 0 to 100" },
             judgeNotes: { type: Type.STRING, description: "A concluding, dramatic quote, blessing, or word of supreme wisdom from the Judge" }
           },
           required: ["caseName", "defendant", "crime", "verdict", "sentence", "catharsisIndex", "judgeNotes"]
