@@ -11,7 +11,7 @@
   --color-primary-container: #2563eb;
   --color-secondary-base: #9d4300;
   --color-secondary-container: #fd761a;
-  --color-bg-base: #faf8ff;
+  --color-bg-base: #f7f7f7;
   --color-on-surface: #191b23;
   --color-on-surface-variant: #434655;
   --color-error-base: #ba1a1a;
@@ -23,7 +23,7 @@
 }
 
 body {
-  background-color: #faf8ff;
+  background-color: #f7f7f7;
   color: #191b23;
   font-family: var(--font-sans);
   -webkit-tap-highlight-color: transparent;
@@ -51,6 +51,101 @@ body {
 .madness-theme {
   --color-primary-base: #ba1a1a;
   --color-primary-container: #ffdad6;
+}
+
+/* Automatic night palette (18:00-05:59, based on the device's local time). */
+.night-theme {
+  --color-bg-base: #0d0d0d;
+  --color-on-surface: #f2f2f2;
+  --color-on-surface-variant: #b8b8b8;
+  --color-surface-container: #1b1b1b;
+  --color-surface-container-high: #242424;
+  color-scheme: dark;
+}
+
+.night-theme body,
+body:has(> #root > .night-theme) {
+  background-color: #0d0d0d;
+  color: #f2f2f2;
+}
+
+.night-theme .bg-bg-base {
+  background-color: #0d0d0d !important;
+}
+
+.night-theme .glass-card {
+  background: rgba(28, 28, 28, 0.92);
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.24);
+}
+
+.night-theme :where(
+  [class~="bg-white"],
+  [class~="bg-white/75"],
+  [class~="bg-white/80"],
+  [class~="bg-white/90"],
+  [class~="bg-white/95"]
+) {
+  background-color: rgba(25, 25, 25, 0.96) !important;
+}
+
+.night-theme :where([class~="bg-gray-50"], [class~="bg-gray-100"], [class~="bg-gray-200"]) {
+  background-color: #242424 !important;
+}
+
+.night-theme :where([class~="text-gray-800"], [class~="text-gray-700"], [class~="text-gray-600"]) {
+  color: #f1f1f1 !important;
+}
+
+.night-theme [class~="text-gray-500"] {
+  color: #b9b9b9 !important;
+}
+
+.night-theme [class~="text-gray-400"] {
+  color: #8f8f8f !important;
+}
+
+.night-theme :where([class~="border-gray-100"], [class~="border-gray-200"], [class~="divide-gray-100"]) {
+  border-color: #343434 !important;
+}
+
+.night-theme [class~="divide-gray-100"] > :not(:last-child) {
+  border-color: #343434 !important;
+}
+
+.night-theme :where(
+  [class~="bg-blue-50"],
+  [class~="bg-blue-50/50"],
+  [class~="bg-blue-50/60"],
+  [class~="bg-blue-50/70"]
+) {
+  background-color: rgba(37, 99, 235, 0.16) !important;
+}
+
+.night-theme :where([class~="bg-orange-50"], [class~="bg-orange-50/60"], [class~="bg-orange-50/70"]) {
+  background-color: rgba(234, 88, 12, 0.15) !important;
+}
+
+.night-theme :where([class~="bg-purple-50"], [class~="bg-purple-50/60"], [class~="bg-purple-50/70"]) {
+  background-color: rgba(147, 51, 234, 0.15) !important;
+}
+
+.night-theme :where([class~="bg-red-50"], [class~="bg-red-50/60"], [class~="bg-red-50/70"]) {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+}
+
+.night-theme :where(input, select, textarea) {
+  background-color: #202020 !important;
+  border-color: #3a3a3a !important;
+  color: #f5f5f5 !important;
+}
+
+.night-theme :where(input, textarea)::placeholder {
+  color: #777 !important;
+}
+
+.night-theme [class~="hover:bg-gray-50"]:hover {
+  background-color: #262626 !important;
 }
 
 /* Custom material icon styling mapping to FILL transitions */

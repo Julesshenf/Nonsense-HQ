@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Identity, FavoriteItem, HistoryItem, PlayerAccount } from "./types";
 import { Header } from "./components/Header";
 import { TabTools } from "./components/TabTools";
@@ -22,6 +22,11 @@ const getStoredAccount = (): PlayerAccount | null => {
   }
 };
 
+const isNightTime = () => {
+  const hour = new Date().getHours();
+  return hour < 6 || hour >= 18;
+};
+
 export default function App() {
   // Navigation State
   const [activeTab, setActiveTab] = useState<"tools" | "rankings" | "my">("tools");
@@ -29,6 +34,10 @@ export default function App() {
   // Core Identity & Theme
   const [identity, setIdentity] = useState<Identity>("Student");
   const [isMadness, setIsMadness] = useState<boolean>(false);
+  const [automaticIsNight, setAutomaticIsNight] = useState(isNightTime);
+  const [manualIsNight, setManualIsNight] = useState<boolean | null>(null);
+  const previousAutomaticTheme = useRef(automaticIsNight);
+  const isNight = manualIsNight ?? automaticIsNight;
 
   // Profile data
   const [userName, setUserName] = useState("Alex 摸鱼大师");
@@ -94,6 +103,30 @@ export default function App() {
       console.error("Failed to load local storage data", e);
     }
   }, []);
+
+  useEffect(() => {
+    const updateThemeByTime = () => setAutomaticIsNight(isNightTime());
+    const timer = window.setInterval(updateThemeByTime, 60_000);
+
+    updateThemeByTime();
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (previousAutomaticTheme.current !== automaticIsNight) {
+      previousAutomaticTheme.current = automaticIsNight;
+      setManualIsNight(null);
+    }
+  }, [automaticIsNight]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("night-theme", isNight);
+    return () => document.documentElement.classList.remove("night-theme");
+  }, [isNight]);
+
+  const handleThemeToggle = () => {
+    setManualIsNight((currentTheme) => !(currentTheme ?? automaticIsNight));
+  };
 
   const handleToggleMadness = () => {
     const nextVal = !isMadness;
@@ -280,13 +313,14 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-bg-base text-on-surface flex flex-col transition-colors duration-300 ${isMadness ? "bg-red-50/10" : ""}`}>
+    <div className={`min-h-screen bg-bg-base text-on-surface flex flex-col transition-colors duration-300 ${isNight ? "night-theme" : ""} ${isMadness ? "bg-red-50/10" : ""}`}>
       {/* Dynamic Header */}
       <Header
         isMadness={isMadness}
         activeTab={activeTab}
         onMyClick={() => setActiveTab((currentTab) => currentTab === "my" ? "tools" : "my")}
         onRankingsClick={() => setActiveTab("rankings")}
+        onThemeToggle={handleThemeToggle}
       />
 
       {/* Main Container */}

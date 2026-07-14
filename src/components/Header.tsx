@@ -5,6 +5,7 @@ interface HeaderProps {
   activeTab: "tools" | "rankings" | "my";
   onMyClick: () => void;
   onRankingsClick: () => void;
+  onThemeToggle: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -12,6 +13,7 @@ export const Header: React.FC<HeaderProps> = ({
   activeTab,
   onMyClick,
   onRankingsClick,
+  onThemeToggle,
 }) => {
   const activeClasses = isMadness ? "bg-red-600 text-white shadow-sm" : "bg-blue-600 text-white shadow-sm";
   const idleClasses = isMadness ? "text-red-600 hover:bg-red-50" : "text-blue-600 hover:bg-blue-50";
@@ -30,6 +32,13 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <span className={`material-symbols-outlined text-[28px] ${activeTab === "my" ? "material-fill" : ""}`}>person</span>
         </button>
+        <button
+          type="button"
+          onClick={onThemeToggle}
+          className="h-10 w-10 rounded-full opacity-0 outline-none focus-visible:opacity-30 focus-visible:ring-2 focus-visible:ring-blue-500"
+          id="header-theme-toggle"
+          aria-label="切换黑白主题"
+        />
       </div>
 
       <div aria-hidden="true" />
